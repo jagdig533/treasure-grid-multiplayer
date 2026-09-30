@@ -248,7 +248,8 @@ function nextConnectedIndexFrom(room, startIndex) {
 const DAILY_GRID_SIZE = 8;
 const DAILY_TREASURES = 10;
 const DAILY_BOMBS = 8;
-const LEADERBOARD_PATH = path.join(__dirname, 'data', 'leaderboard.json');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const LEADERBOARD_PATH = path.join(DATA_DIR, 'leaderboard.json');
 
 function mulberry32(seed) {
   let a = seed;

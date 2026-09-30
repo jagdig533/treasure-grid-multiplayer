@@ -10,6 +10,17 @@ let lastTickSecond = null;
 let matchRecorded = null; // guards double-recording profile stats for a given code+roundNumber
 let pendingReveal = null; // { x, y, timeoutHandle } - blocks re-clicking until the server responds
 const PENDING_REVEAL_TIMEOUT_MS = 4000;
+let lastConnectedState = {}; // playerId -> connected, so we can detect a fresh disconnect
+
+function showToast(text) {
+  const layer = document.getElementById('reaction-layer');
+  if (!layer) return;
+  const toast = document.createElement('div');
+  toast.className = 'toast-bubble';
+  toast.textContent = text;
+  layer.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
 
 const REVEAL_ANIM_MS = 320;
 const PARTICLE_ANIM_MS = 600;
@@ -26,6 +37,22 @@ function showScreen(name) {
   Object.values(screens).forEach((el) => el.classList.remove('active'));
   screens[name].classList.add('active');
 }
+
+// --- How to Play modal ---
+
+const howToPlayModal = document.getElementById('how-to-play-modal');
+document.getElementById('how-to-play-btn').addEventListener('click', () => {
+  howToPlayModal.hidden = false;
+});
+document.getElementById('how-to-play-close').addEventListener('click', () => {
+  howToPlayModal.hidden = true;
+});
+howToPlayModal.addEventListener('click', (e) => {
+  if (e.target === howToPlayModal) howToPlayModal.hidden = true;
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !howToPlayModal.hidden) howToPlayModal.hidden = true;
+});
 
 function getName() {
   return document.getElementById('name-input').value.trim() || 'Player';
@@ -528,11 +555,18 @@ function renderGame(room) {
 
   canvas.classList.toggle('sudden-death', !!room.suddenDeath);
 
+  room.players.forEach((p) => {
+    if (lastConnectedState[p.id] === true && p.connected === false) {
+      showToast(`🚪 ${p.name} left the game`);
+    }
+    lastConnectedState[p.id] = p.connected;
+  });
+
   const scoreboard = document.getElementById('scoreboard');
   scoreboard.innerHTML = '';
   room.players.forEach((p) => {
     const chip = document.createElement('div');
-    chip.className = 'chip' + (p.id === room.turnPlayerId ? ' turn' : '');
+    chip.className = 'chip' + (p.id === room.turnPlayerId ? ' turn' : '') + (p.connected ? '' : ' disconnected');
     chip.textContent = `${p.name}: ${p.score}${p.shielded ? ' 🛡️' : ''}${p.connected ? '' : ' (left)'}`;
     scoreboard.appendChild(chip);
   });
@@ -676,6 +710,7 @@ socket.on('room:update', (room) => {
 
   if (room.status === 'lobby') {
     prevGrid = null;
+    lastConnectedState = {};
     clearPendingReveal();
     showScreen('lobby');
     renderLobby(room);

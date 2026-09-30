@@ -237,6 +237,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-size: 0.85rem;
 }
 .scoreboard .chip.turn { outline: 2px solid var(--success); }
+.scoreboard .chip.disconnected { opacity: 0.5; text-decoration: line-through; }
 
 .spectator-chip {
   text-align: center;
@@ -317,6 +318,25 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-size: 1.6rem;
   animation: float-up 1.8s ease-out forwards;
 }
+.toast-bubble {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  animation: toast-fade 3s ease forwards;
+}
+@keyframes toast-fade {
+  0% { opacity: 0; transform: translate(-50%, -8px); }
+  10% { opacity: 1; transform: translate(-50%, 0); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, 0); }
+}
 @keyframes float-up {
   0% { transform: translateY(0); opacity: 1; }
   100% { transform: translateY(-140px); opacity: 0; }
@@ -356,6 +376,57 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   margin: 0 auto 16px;
   touch-action: manipulation;
 }
+
+header .ghost {
+  margin-top: 8px;
+}
+
+.modal-backdrop[hidden] {
+  display: none;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 100;
+}
+
+.modal {
+  position: relative;
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modal h2 { margin-top: 0; }
+
+.modal-body ul {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  padding: 4px 8px;
+}
+.modal-close:hover { color: var(--text); background: transparent; }
 
 @media (max-width: 480px) {
   .card { padding: 16px; }
