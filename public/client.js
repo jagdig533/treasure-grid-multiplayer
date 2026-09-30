@@ -49,6 +49,7 @@ function showError(msg) {
 
 document.getElementById('grid-size-input').addEventListener('change', pushSettings);
 document.getElementById('treasure-count-input').addEventListener('change', pushSettings);
+document.getElementById('bomb-count-input').addEventListener('change', pushSettings);
 
 function pushSettings() {
   if (!currentRoom) return;
@@ -56,6 +57,7 @@ function pushSettings() {
     code: currentRoom.code,
     gridSize: document.getElementById('grid-size-input').value,
     treasureCount: document.getElementById('treasure-count-input').value,
+    bombCount: document.getElementById('bomb-count-input').value,
   });
 }
 
@@ -74,8 +76,10 @@ function renderLobby(room) {
   document.getElementById('host-settings').hidden = !isHost;
   document.getElementById('grid-size-input').value = room.gridSize;
   document.getElementById('treasure-count-input').value = room.treasureCount;
+  document.getElementById('bomb-count-input').value = room.bombCount;
   document.getElementById('grid-size-input').disabled = !isHost;
   document.getElementById('treasure-count-input').disabled = !isHost;
+  document.getElementById('bomb-count-input').disabled = !isHost;
 
   const list = document.getElementById('player-list');
   list.innerHTML = '';
@@ -136,6 +140,8 @@ function drawGrid(room) {
         ctx.fillStyle = (x + y) % 2 === 0 ? '#273449' : '#1e293b';
       } else if (cell === 'treasure') {
         ctx.fillStyle = '#f4b942';
+      } else if (cell === 'bomb') {
+        ctx.fillStyle = '#7f1d1d';
       } else {
         ctx.fillStyle = '#334155';
       }
@@ -148,6 +154,11 @@ function drawGrid(room) {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('💰', px + cellSize / 2, py + cellSize / 2);
+      } else if (cell === 'bomb') {
+        ctx.font = `${cellSize * 0.5}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('💣', px + cellSize / 2, py + cellSize / 2);
       }
     }
   }
@@ -205,13 +216,13 @@ socket.on('room:update', (room) => {
   currentRoom = room;
 
   if (room.status === 'lobby') {
-    renderLobby(room);
     showScreen('lobby');
+    renderLobby(room);
   } else if (room.status === 'playing') {
-    renderGame(room);
     showScreen('game');
+    renderGame(room);
   } else if (room.status === 'finished') {
-    renderFinished(room);
     showScreen('finished');
+    renderFinished(room);
   }
 });

@@ -1,8 +1,9 @@
 # Treasure Grid
 
-A turn-based multiplayer treasure hunt. One shared grid, hidden treasures — players take turns
-revealing cells. Find a treasure, score a point and go again; reveal an empty cell and the turn
-passes to the next player. Most treasures found when the grid is cleared wins.
+A turn-based multiplayer treasure hunt. One shared grid, hidden treasures and bombs — players take
+turns revealing cells. Find a treasure, score a point and go again; reveal an empty cell and the
+turn passes to the next player; hit a bomb and you lose a point (score never drops below 0) and
+your turn ends immediately. Most treasures found when the grid is cleared wins.
 
 ## Running locally
 
@@ -16,7 +17,7 @@ friends) to play.
 
 - One player creates a room and shares the 4-letter room code.
 - Others join with that code.
-- The host sets grid size and treasure count, then starts the game.
+- The host sets grid size, treasure count, and bomb count, then starts the game.
 - Players take turns clicking cells on the grid.
 
 ## Tech stack

@@ -34,8 +34,10 @@ function createRoom(hostSocketId, hostName) {
     players: [{ id: hostSocketId, name: hostName, score: 0, connected: true }],
     gridSize: 8,
     treasureCount: 10,
-    grid: null, // revealed by [x][y]: null = hidden, 'treasure' | 'empty'
+    bombCount: 5,
+    grid: null, // revealed by [x][y]: null = hidden, 'treasure' | 'empty' | 'bomb'
     treasurePositions: null,
+    bombPositions: null,
     treasuresRemaining: 0,
     turnIndex: 0,
     status: 'lobby', // lobby | playing | finished
@@ -51,6 +53,7 @@ function publicRoomState(room) {
     players: room.players.map((p) => ({ id: p.id, name: p.name, score: p.score, connected: p.connected })),
     gridSize: room.gridSize,
     treasureCount: room.treasureCount,
+    bombCount: room.bombCount,
     grid: room.grid,
     treasuresRemaining: room.treasuresRemaining,
     turnPlayerId: room.status === 'playing' ? room.players[room.turnIndex]?.id : null,
@@ -66,13 +69,21 @@ function startGame(room) {
   const size = room.gridSize;
   const total = size * size;
   const treasureCount = Math.min(room.treasureCount, total - 1);
+  const bombCount = Math.min(room.bombCount, total - treasureCount);
 
-  const positions = new Set();
-  while (positions.size < treasureCount) {
-    positions.add(Math.floor(Math.random() * total));
+  const treasurePositions = new Set();
+  while (treasurePositions.size < treasureCount) {
+    treasurePositions.add(Math.floor(Math.random() * total));
   }
 
-  room.treasurePositions = positions;
+  const bombPositions = new Set();
+  while (bombPositions.size < bombCount) {
+    const candidate = Math.floor(Math.random() * total);
+    if (!treasurePositions.has(candidate)) bombPositions.add(candidate);
+  }
+
+  room.treasurePositions = treasurePositions;
+  room.bombPositions = bombPositions;
   room.treasuresRemaining = treasureCount;
   room.grid = Array.from({ length: size }, () => Array(size).fill(null));
   room.turnIndex = 0;
@@ -118,12 +129,14 @@ io.on('connection', (socket) => {
     broadcastRoom(room);
   });
 
-  socket.on('room:settings', ({ code, gridSize, treasureCount }) => {
+  socket.on('room:settings', ({ code, gridSize, treasureCount, bombCount }) => {
     const room = rooms.get(code);
     if (!room || room.hostId !== socket.id || room.status !== 'lobby') return;
     room.gridSize = Math.max(MIN_GRID_SIZE, Math.min(MAX_GRID_SIZE, Number(gridSize) || room.gridSize));
-    const maxTreasures = room.gridSize * room.gridSize - 1;
-    room.treasureCount = Math.max(1, Math.min(maxTreasures, Number(treasureCount) || room.treasureCount));
+    const total = room.gridSize * room.gridSize;
+    room.treasureCount = Math.max(1, Math.min(total - 1, Number(treasureCount) || room.treasureCount));
+    const maxBombs = total - room.treasureCount;
+    room.bombCount = Math.max(0, Math.min(maxBombs, Number.isFinite(Number(bombCount)) ? Number(bombCount) : room.bombCount));
     broadcastRoom(room);
   });
 
@@ -146,13 +159,18 @@ io.on('connection', (socket) => {
 
     const cellIndex = y * room.gridSize + x;
     const isTreasure = room.treasurePositions.has(cellIndex);
+    const isBomb = room.bombPositions.has(cellIndex);
 
-    room.grid[y][x] = isTreasure ? 'treasure' : 'empty';
+    room.grid[y][x] = isTreasure ? 'treasure' : isBomb ? 'bomb' : 'empty';
 
     if (isTreasure) {
       currentPlayer.score += 1;
       room.treasuresRemaining -= 1;
       room.treasurePositions.delete(cellIndex);
+    } else if (isBomb) {
+      currentPlayer.score = Math.max(0, currentPlayer.score - 1);
+      room.bombPositions.delete(cellIndex);
+      advanceTurn(room);
     } else {
       advanceTurn(room);
     }
@@ -170,6 +188,7 @@ io.on('connection', (socket) => {
     room.status = 'lobby';
     room.grid = null;
     room.treasurePositions = null;
+    room.bombPositions = null;
     broadcastRoom(room);
   });
 
