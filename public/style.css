@@ -1,0 +1,193 @@
+:root {
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --panel-alt: #273449;
+  --accent: #f4b942;
+  --accent-dark: #c9941f;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --danger: #ef4444;
+  --success: #22c55e;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+header h1 { margin: 0 0 4px; }
+.subtitle { color: var(--text-dim); margin: 0; }
+
+main { width: 100%; max-width: 640px; }
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+.card {
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+input {
+  background: var(--panel-alt);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+input:focus { outline: 2px solid var(--accent); }
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.button-row input { flex: 1; }
+
+button {
+  background: var(--panel-alt);
+  color: var(--text);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+button:hover { background: #334155; }
+
+button.primary {
+  background: var(--accent);
+  color: #1a1305;
+  border: none;
+  font-weight: 600;
+}
+
+button.primary:hover { background: var(--accent-dark); }
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.divider {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.error {
+  color: var(--danger);
+  min-height: 1.2em;
+  margin: 0;
+}
+
+.hint {
+  color: var(--text-dim);
+  text-align: center;
+  margin: 8px 0 0;
+}
+
+.host-settings {
+  display: flex;
+  gap: 16px;
+}
+.host-settings label { flex: 1; }
+
+.player-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.player-list li {
+  background: var(--panel-alt);
+  padding: 10px 12px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.player-list li.you { border: 1px solid var(--accent); }
+.player-list li.disconnected { opacity: 0.5; }
+.player-list li.turn { border: 1px solid var(--success); }
+
+.game-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.turn-banner {
+  text-align: center;
+  font-weight: 600;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.turn-banner.your-turn {
+  background: var(--success);
+  color: #06210f;
+}
+
+.scoreboard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.scoreboard .chip {
+  background: var(--panel-alt);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.scoreboard .chip.turn { outline: 2px solid var(--success); }
+
+#grid-canvas {
+  width: 100%;
+  aspect-ratio: 1;
+  background: var(--panel);
+  border-radius: 12px;
+  display: block;
+  touch-action: manipulation;
+}
+
+@media (max-width: 480px) {
+  .card { padding: 16px; }
+}
