@@ -344,7 +344,7 @@ function triggerFlash() {
   flash.classList.add('active');
 }
 
-const WARMTH_COLORS = { 1: '#38bdf8', 2: '#f59e0b', 3: '#ef4444' };
+const WARMTH_FRUIT = '🍓';
 
 function drawCell(targetCtx, x, y, cellSize, cell, scale = 1, alpha = 1) {
   const px = x * cellSize;
@@ -395,16 +395,16 @@ function drawCell(targetCtx, x, y, cellSize, cell, scale = 1, alpha = 1) {
       targetCtx.textBaseline = 'middle';
       targetCtx.fillText(POWERUP_ICONS[cell.kind], px + cellSize / 2, py + cellSize / 2);
     } else if (cell.type === 'empty' && cell.warmth > 0) {
-      const dotRadius = Math.max(2, cellSize * 0.06);
-      const spacing = dotRadius * 2.6;
+      const fruitSize = cellSize * 0.24;
+      const spacing = fruitSize * 1.05;
       const totalWidth = spacing * (cell.warmth - 1);
       const startX = px + cellSize / 2 - totalWidth / 2;
-      const dotY = py + cellSize * 0.78;
-      targetCtx.fillStyle = WARMTH_COLORS[cell.warmth];
+      const fruitY = py + cellSize * 0.78;
+      targetCtx.font = `${fruitSize}px sans-serif`;
+      targetCtx.textAlign = 'center';
+      targetCtx.textBaseline = 'middle';
       for (let i = 0; i < cell.warmth; i++) {
-        targetCtx.beginPath();
-        targetCtx.arc(startX + i * spacing, dotY, dotRadius, 0, Math.PI * 2);
-        targetCtx.fill();
+        targetCtx.fillText(WARMTH_FRUIT, startX + i * spacing, fruitY);
       }
     }
   }
