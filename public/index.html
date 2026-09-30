@@ -28,8 +28,36 @@
           <input id="code-input" type="text" maxlength="4" placeholder="ROOM CODE" style="text-transform:uppercase" />
           <button id="join-btn">Join Room</button>
         </div>
+        <div class="button-row">
+          <button id="spectate-btn" class="ghost">Watch as Spectator</button>
+        </div>
 
         <p id="home-error" class="error"></p>
+
+        <div class="divider">or</div>
+        <div class="button-row">
+          <button id="daily-btn" class="secondary">🗓️ Daily Challenge</button>
+        </div>
+
+        <div id="profile-panel" class="profile-panel">
+          <h3>Your Stats</h3>
+          <div class="stat-row">
+            <span>Matches won</span><span id="stat-wins">0</span>
+          </div>
+          <div class="stat-row">
+            <span>Matches played</span><span id="stat-games">0</span>
+          </div>
+          <div class="stat-row">
+            <span>Lifetime treasures</span><span id="stat-treasures">0</span>
+          </div>
+          <label>Theme
+            <select id="theme-select">
+              <option value="default">Default</option>
+              <option value="forest">Forest (5 matches)</option>
+              <option value="neon">Neon (15 matches)</option>
+            </select>
+          </label>
+        </div>
       </div>
     </section>
 
@@ -37,6 +65,7 @@
       <div class="card">
         <h2>Room <span id="lobby-code"></span></h2>
         <p>Share this code with friends so they can join.</p>
+        <p id="match-progress" class="hint" hidden></p>
 
         <div id="host-settings" class="host-settings" hidden>
           <label>Grid size
@@ -48,10 +77,18 @@
           <label>Bombs
             <input id="bomb-count-input" type="number" min="0" value="5" />
           </label>
+          <label>Power-ups
+            <input id="powerup-count-input" type="number" min="0" value="3" />
+          </label>
         </div>
 
         <h3>Players</h3>
         <ul id="player-list" class="player-list"></ul>
+
+        <div id="spectator-panel" class="spectator-panel" hidden>
+          <h3>👀 Watching</h3>
+          <ul id="spectator-list" class="player-list"></ul>
+        </div>
 
         <button id="start-btn" class="primary" hidden>Start Game</button>
         <p id="lobby-hint" class="hint"></p>
@@ -61,18 +98,56 @@
     <section id="screen-game" class="screen">
       <div class="game-header">
         <div id="turn-banner" class="turn-banner"></div>
+        <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
         <div id="scoreboard" class="scoreboard"></div>
+        <div id="spectator-chip" class="spectator-chip" hidden></div>
       </div>
-      <canvas id="grid-canvas"></canvas>
+      <div class="canvas-wrap">
+        <canvas id="grid-canvas"></canvas>
+        <div id="flash-overlay" class="flash-overlay"></div>
+        <div id="peek-overlay" class="peek-overlay" hidden></div>
+        <div id="reaction-layer" class="reaction-layer"></div>
+      </div>
       <p id="treasures-left" class="hint"></p>
+      <div id="reaction-bar" class="reaction-bar">
+        <button data-emoji="👍">👍</button>
+        <button data-emoji="😂">😂</button>
+        <button data-emoji="😮">😮</button>
+        <button data-emoji="💥">💥</button>
+        <button data-emoji="🔥">🔥</button>
+      </div>
     </section>
 
     <section id="screen-finished" class="screen">
       <div class="card">
-        <h2>🏆 Game Over</h2>
+        <h2 id="finished-title">🏆 Round Over</h2>
+        <p id="match-summary" class="hint"></p>
         <ol id="final-scores" class="player-list"></ol>
+        <div id="awards" class="awards"></div>
+        <button id="copy-result-btn" class="secondary">Copy Result</button>
         <button id="rematch-btn" class="primary" hidden>Play Again</button>
         <p id="finished-hint" class="hint"></p>
+      </div>
+    </section>
+
+    <section id="screen-daily" class="screen">
+      <div class="card">
+        <h2>🗓️ Daily Challenge</h2>
+        <p class="hint">Same board for everyone today. No turns — play at your own pace.</p>
+        <p id="daily-score" class="hint"></p>
+      </div>
+      <canvas id="daily-canvas"></canvas>
+      <div id="daily-submit" class="card" hidden>
+        <p>Nice run! Submit your score to today's leaderboard.</p>
+        <div class="button-row">
+          <input id="daily-name-input" type="text" maxlength="20" placeholder="Your name" />
+          <button id="daily-submit-btn" class="primary">Submit</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Today's Leaderboard</h3>
+        <ol id="daily-leaderboard" class="player-list"></ol>
+        <button id="daily-back-btn" class="secondary">Back to Home</button>
       </div>
     </section>
   </main>
