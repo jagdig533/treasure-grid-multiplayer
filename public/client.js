@@ -8,6 +8,8 @@ let particles = []; // { x, y, startTime, color }
 let gameLoopRunning = false;
 let lastTickSecond = null;
 let matchRecorded = null; // guards double-recording profile stats for a given code+roundNumber
+let pendingReveal = null; // { x, y, timeoutHandle } - blocks re-clicking until the server responds
+const PENDING_REVEAL_TIMEOUT_MS = 4000;
 
 const REVEAL_ANIM_MS = 320;
 const PARTICLE_ANIM_MS = 600;
@@ -254,21 +256,48 @@ const canvas = document.getElementById('grid-canvas');
 const ctx = canvas.getContext('2d');
 const canvasWrap = document.querySelector('.canvas-wrap');
 
+// The full grid is expensive to redraw (fillRect + emoji text per cell), so it's
+// only rendered onto this offscreen layer when a move actually changes the board.
+// Every animation frame just blits that cached bitmap plus the handful of cells
+// currently mid-reveal-animation, instead of redrawing all cells at 60fps.
+const baseCanvas = document.createElement('canvas');
+const baseCtx = baseCanvas.getContext('2d');
+
 function resizeCanvas() {
   const size = canvas.clientWidth;
   canvas.width = size;
   canvas.height = size;
+  baseCanvas.width = size;
+  baseCanvas.height = size;
+  if (currentRoom && currentRoom.grid) renderBaseLayer(currentRoom);
 }
 window.addEventListener('resize', resizeCanvas);
+
+function clearPendingReveal() {
+  if (pendingReveal) {
+    clearTimeout(pendingReveal.timeoutHandle);
+    pendingReveal = null;
+  }
+}
 
 canvas.addEventListener('click', (e) => {
   if (isSpectator || !currentRoom || currentRoom.status !== 'playing') return;
   if (currentRoom.turnPlayerId !== socket.id) return;
+  if (pendingReveal) return; // already waiting on a click's response - ignore rapid re-clicks
 
   const rect = canvas.getBoundingClientRect();
   const cellSize = canvas.width / currentRoom.gridSize;
   const x = Math.floor((e.clientX - rect.left) / cellSize);
   const y = Math.floor((e.clientY - rect.top) / cellSize);
+  if (currentRoom.grid[y]?.[x] !== null) return; // already revealed
+
+  // Give instant feedback instead of waiting on the network round-trip: lock
+  // input and mark the clicked cell right away so a slow/spiky connection
+  // doesn't tempt a re-click that lands after the turn has already passed.
+  pendingReveal = {
+    x, y,
+    timeoutHandle: setTimeout(clearPendingReveal, PENDING_REVEAL_TIMEOUT_MS),
+  };
 
   socket.emit('game:reveal', { code: currentRoom.code, x, y });
 });
@@ -277,13 +306,6 @@ const TIER_COLORS = { bronze: '#b45309', silver: '#cbd5e1', gold: '#f4b942' };
 const TIER_LABELS = { bronze: 'B', silver: 'S', gold: 'G' };
 const POWERUP_COLORS = { peek: '#0ea5e9', 'extra-turn': '#a855f7', shield: '#10b981' };
 const POWERUP_ICONS = { peek: '👁️', 'extra-turn': '⏩', shield: '🛡️' };
-
-function cellKey(cell) {
-  if (!cell) return 'hidden';
-  if (cell.type === 'treasure') return 'treasure:' + cell.tier;
-  if (cell.type === 'powerup') return 'powerup:' + cell.kind;
-  return cell.type;
-}
 
 function diffAndAnimate(oldGrid, newGrid) {
   if (!oldGrid) return;
@@ -322,95 +344,131 @@ function triggerFlash() {
   flash.classList.add('active');
 }
 
-function drawCellBase(x, y, cellSize, cell, scale = 1, alpha = 1) {
+const WARMTH_COLORS = { 1: '#38bdf8', 2: '#f59e0b', 3: '#ef4444' };
+
+function drawCell(targetCtx, x, y, cellSize, cell, scale = 1, alpha = 1) {
   const px = x * cellSize;
   const py = y * cellSize;
   const pad = (cellSize * (1 - scale)) / 2;
 
-  ctx.save();
-  ctx.globalAlpha = alpha;
+  targetCtx.save();
+  targetCtx.globalAlpha = alpha;
 
   if (cell === null) {
-    ctx.fillStyle = (x + y) % 2 === 0 ? '#273449' : '#1e293b';
-    ctx.fillRect(px, py, cellSize, cellSize);
+    targetCtx.fillStyle = (x + y) % 2 === 0 ? '#273449' : '#1e293b';
+    targetCtx.fillRect(px, py, cellSize, cellSize);
   } else if (cell.type === 'treasure') {
-    ctx.fillStyle = TIER_COLORS[cell.tier];
-    ctx.fillRect(px + pad, py + pad, cellSize * scale, cellSize * scale);
+    targetCtx.fillStyle = TIER_COLORS[cell.tier];
+    targetCtx.fillRect(px + pad, py + pad, cellSize * scale, cellSize * scale);
   } else if (cell.type === 'bomb') {
-    ctx.fillStyle = '#7f1d1d';
-    ctx.fillRect(px + pad, py + pad, cellSize * scale, cellSize * scale);
+    targetCtx.fillStyle = '#7f1d1d';
+    targetCtx.fillRect(px + pad, py + pad, cellSize * scale, cellSize * scale);
   } else if (cell.type === 'powerup') {
-    ctx.fillStyle = POWERUP_COLORS[cell.kind];
-    ctx.fillRect(px + pad, py + pad, cellSize * scale, cellSize * scale);
+    targetCtx.fillStyle = POWERUP_COLORS[cell.kind];
+    targetCtx.fillRect(px + pad, py + pad, cellSize * scale, cellSize * scale);
   } else {
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(px + pad, py + pad, cellSize * scale, cellSize * scale);
+    targetCtx.fillStyle = '#334155';
+    targetCtx.fillRect(px + pad, py + pad, cellSize * scale, cellSize * scale);
   }
 
-  ctx.strokeStyle = '#0f172a';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(px, py, cellSize, cellSize);
+  targetCtx.strokeStyle = '#0f172a';
+  targetCtx.lineWidth = 1;
+  targetCtx.strokeRect(px, py, cellSize, cellSize);
 
   if (cell) {
-    ctx.font = `${cellSize * 0.5 * scale}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
     if (cell.type === 'treasure') {
-      ctx.fillText('💰', px + cellSize / 2, py + cellSize / 2);
-      ctx.font = `${cellSize * 0.22}px sans-serif`;
-      ctx.fillStyle = '#1a1305';
-      ctx.fillText(TIER_LABELS[cell.tier], px + cellSize * 0.82, py + cellSize * 0.18);
+      targetCtx.font = `${cellSize * 0.5 * scale}px sans-serif`;
+      targetCtx.textAlign = 'center';
+      targetCtx.textBaseline = 'middle';
+      targetCtx.fillText('💰', px + cellSize / 2, py + cellSize / 2);
+      targetCtx.font = `${cellSize * 0.22}px sans-serif`;
+      targetCtx.fillStyle = '#1a1305';
+      targetCtx.fillText(TIER_LABELS[cell.tier], px + cellSize * 0.82, py + cellSize * 0.18);
     } else if (cell.type === 'bomb') {
-      ctx.fillText('💣', px + cellSize / 2, py + cellSize / 2);
+      targetCtx.font = `${cellSize * 0.5 * scale}px sans-serif`;
+      targetCtx.textAlign = 'center';
+      targetCtx.textBaseline = 'middle';
+      targetCtx.fillText('💣', px + cellSize / 2, py + cellSize / 2);
     } else if (cell.type === 'powerup') {
-      ctx.fillText(POWERUP_ICONS[cell.kind], px + cellSize / 2, py + cellSize / 2);
+      targetCtx.font = `${cellSize * 0.5 * scale}px sans-serif`;
+      targetCtx.textAlign = 'center';
+      targetCtx.textBaseline = 'middle';
+      targetCtx.fillText(POWERUP_ICONS[cell.kind], px + cellSize / 2, py + cellSize / 2);
     } else if (cell.type === 'empty' && cell.warmth > 0) {
-      ctx.font = `${cellSize * 0.28}px sans-serif`;
-      ctx.fillText('🔥'.repeat(cell.warmth), px + cellSize / 2, py + cellSize * 0.78);
-    }
-  }
-
-  ctx.restore();
-}
-
-function drawGrid(room, timestamp) {
-  const size = room.gridSize;
-  const cellSize = canvas.width / size;
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  const animMap = new Map();
-  activeReveals = activeReveals.filter((a) => {
-    const elapsed = timestamp - a.startTime;
-    if (elapsed > REVEAL_ANIM_MS) return false;
-    animMap.set(`${a.x},${a.y}`, elapsed / REVEAL_ANIM_MS);
-    return true;
-  });
-
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const cell = room.grid[y][x];
-      const progress = animMap.get(`${x},${y}`);
-      if (progress !== undefined) {
-        const eased = 1 - Math.pow(1 - progress, 3);
-        drawCellBase(x, y, cellSize, cell, 0.4 + eased * 0.6, eased);
-      } else {
-        drawCellBase(x, y, cellSize, cell, 1, 1);
+      const dotRadius = Math.max(2, cellSize * 0.06);
+      const spacing = dotRadius * 2.6;
+      const totalWidth = spacing * (cell.warmth - 1);
+      const startX = px + cellSize / 2 - totalWidth / 2;
+      const dotY = py + cellSize * 0.78;
+      targetCtx.fillStyle = WARMTH_COLORS[cell.warmth];
+      for (let i = 0; i < cell.warmth; i++) {
+        targetCtx.beginPath();
+        targetCtx.arc(startX + i * spacing, dotY, dotRadius, 0, Math.PI * 2);
+        targetCtx.fill();
       }
     }
   }
 
+  targetCtx.restore();
+}
+
+// Redrawn only when the board actually changes (a reveal happens), not per animation frame.
+function renderBaseLayer(room) {
+  const size = room.gridSize;
+  const cellSize = baseCanvas.width / size;
+  baseCtx.clearRect(0, 0, baseCanvas.width, baseCanvas.height);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      drawCell(baseCtx, x, y, cellSize, room.grid[y][x], 1, 1);
+    }
+  }
+}
+
+// Runs every animation frame: cheap blit of the cached base layer, plus only the
+// handful of cells currently mid-reveal-animation redrawn on top, plus particles.
+function renderFrame(room, timestamp) {
+  const size = room.gridSize;
+  const cellSize = canvas.width / size;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(baseCanvas, 0, 0);
+
+  // A backgrounded/inactive tab throttles requestAnimationFrame, so `timestamp` can
+  // occasionally lag behind a performance.now() captured moments earlier by a socket
+  // event (e.g. a spectator tab, or a player who alt-tabbed during an opponent's turn).
+  // Clamp elapsed/progress so a stale timestamp never produces a negative radius/scale.
+  activeReveals = activeReveals.filter((a) => {
+    const elapsed = Math.max(0, timestamp - a.startTime);
+    if (elapsed > REVEAL_ANIM_MS) return false;
+    const progress = Math.min(1, elapsed / REVEAL_ANIM_MS);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    drawCell(ctx, a.x, a.y, cellSize, null, 1, 1);
+    drawCell(ctx, a.x, a.y, cellSize, a.cell, 0.4 + eased * 0.6, eased);
+    return true;
+  });
+
   particles = particles.filter((p) => timestamp - p.startTime < PARTICLE_ANIM_MS);
   particles.forEach((p) => {
-    const t = (timestamp - p.startTime) / PARTICLE_ANIM_MS;
+    const t = Math.max(0, Math.min(1, (timestamp - p.startTime) / PARTICLE_ANIM_MS));
     ctx.save();
     ctx.globalAlpha = 1 - t;
     ctx.fillStyle = p.color;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 4 + t * 24, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, Math.max(0, 4 + t * 24), 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   });
+
+  if (pendingReveal) {
+    const px = pendingReveal.x * cellSize;
+    const py = pendingReveal.y * cellSize;
+    const pulse = 0.5 + 0.5 * Math.sin(timestamp / 120);
+    ctx.save();
+    ctx.strokeStyle = `rgba(244, 185, 66, ${0.4 + pulse * 0.5})`;
+    ctx.lineWidth = Math.max(2, cellSize * 0.06);
+    ctx.strokeRect(px + ctx.lineWidth / 2, py + ctx.lineWidth / 2, cellSize - ctx.lineWidth, cellSize - ctx.lineWidth);
+    ctx.restore();
+  }
 }
 
 function updateTimerBar() {
@@ -436,7 +494,7 @@ function updateTimerBar() {
 }
 
 function gameLoopTick(timestamp) {
-  if (currentRoom && currentRoom.grid) drawGrid(currentRoom, timestamp);
+  if (currentRoom && currentRoom.grid) renderFrame(currentRoom, timestamp);
   updateTimerBar();
   if (screens.game.classList.contains('active')) {
     requestAnimationFrame(gameLoopTick);
@@ -453,6 +511,10 @@ function ensureGameLoop() {
 }
 
 function renderGame(room) {
+  if (pendingReveal && room.grid[pendingReveal.y]?.[pendingReveal.x] !== null) {
+    clearPendingReveal();
+  }
+
   const isYourTurn = room.turnPlayerId === socket.id;
   const turnPlayer = room.players.find((p) => p.id === room.turnPlayerId);
 
@@ -614,12 +676,14 @@ socket.on('room:update', (room) => {
 
   if (room.status === 'lobby') {
     prevGrid = null;
+    clearPendingReveal();
     showScreen('lobby');
     renderLobby(room);
   } else if (room.status === 'playing') {
     showScreen('game');
     renderGame(room);
   } else if (room.status === 'finished') {
+    clearPendingReveal();
     showScreen('finished');
     renderFinished(room);
   }
